@@ -151,13 +151,14 @@ class BlobManager:
                 prefix = os.path.splitext(os.path.basename(path))[0]
                 blobs = container_client.list_blob_names(name_starts_with=os.path.splitext(os.path.basename(prefix))[0])
             async for blob_path in blobs:
-                # This still supports PDFs split into individual pages, but we could remove in future to simplify code
-                if (
-                    prefix is not None
-                    and (
-                        not re.match(rf"{prefix}-\d+\.pdf", blob_path) or not re.match(rf"{prefix}-\d+\.png", blob_path)
-                    )
-                ) or (path is not None and blob_path == os.path.basename(path)):
+                # Remove the original file as well as any page-level blobs that were
+                # created when ingesting PDFs. Skip unrelated blobs that may share
+                # the same prefix.
+                if prefix is not None and not (
+                    re.match(rf"{prefix}-\d+\.pdf", blob_path)
+                    or re.match(rf"{prefix}-\d+\.png", blob_path)
+                    or blob_path == os.path.basename(path)
+                ):
                     continue
                 logger.info("Removing blob %s", blob_path)
                 await container_client.delete_blob(blob_path)
